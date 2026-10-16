@@ -408,3 +408,9 @@ the first paint: the interface language is a `profile` setting (`locale`), so
 once the settings load, a language the person picked in any OpenChamber client
 replaces it. VS Code's display language stays in effect only while no client
 has saved one.
+
+The same generated HTML carries `window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__`
+when the extension host environment sets `OPENCODE_REQUEST_TIMEOUT_MS`. It is
+the parsed whole-millisecond value from the web server's `env-config.js`, and the
+UI applies it to its non-streaming OpenCode reads; unset or unusable leaves the
+global absent and the UI default (`30000`) stands.

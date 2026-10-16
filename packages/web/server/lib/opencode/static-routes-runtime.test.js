@@ -34,6 +34,20 @@ const createServingRuntime = (distPath) => createStaticRoutesRuntime({
   normalizePwaOrientation: (value) => value,
 });
 
+const createTimeoutServingRuntime = (distPath, timeout) => createStaticRoutesRuntime({
+  fs,
+  path,
+  process: { env: { OPENCHAMBER_DIST_DIR: distPath, OPENCODE_REQUEST_TIMEOUT_MS: timeout } },
+  __dirname: '/server',
+  express,
+  resolveProjectDirectory: () => '',
+  buildOpenCodeUrl: () => '',
+  getOpenCodeAuthHeaders: () => ({}),
+  readSettingsFromDiskMigrated: async () => ({}),
+  normalizePwaAppName: (value) => value,
+  normalizePwaOrientation: (value) => value,
+});
+
 describe('static file caching', () => {
   let distPath;
 
@@ -71,6 +85,66 @@ describe('static file caching', () => {
 
     expect(favicon.headers['cache-control']).toBe('public, max-age=0');
     expect(serviceWorker.headers['cache-control']).toBe('no-store');
+  });
+
+  it('serves the fallback document unchanged without a timeout override', async () => {
+    const app = express();
+    createServingRuntime(distPath).registerStaticRoutes(app);
+
+    const response = await request(app).get('/sessions/abc');
+
+    expect(response.status).toBe(200);
+    expect(response.text).toBe('<!doctype html>');
+    expect(response.text).not.toContain('__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__');
+  });
+});
+
+describe('opencode request timeout injection', () => {
+  let distPath;
+
+  beforeAll(() => {
+    distPath = fs.mkdtempSync(path.join(os.tmpdir(), 'oc-timeout-routes-'));
+    fs.writeFileSync(
+      path.join(distPath, 'index.html'),
+      '<!doctype html><html><head><title>app</title></head><body></body></html>',
+    );
+  });
+
+  afterAll(() => {
+    fs.rmSync(distPath, { recursive: true, force: true });
+  });
+
+  const serve = (timeout) => {
+    const app = express();
+    createTimeoutServingRuntime(distPath, timeout).registerStaticRoutes(app);
+    return app;
+  };
+
+  it('stamps the override into the fallback document and never caches it', async () => {
+    const app = serve('90000');
+    const response = await request(app).get('/sessions/abc');
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__=90000;');
+    expect(response.headers['cache-control']).toBe('no-store');
+
+    const root = await request(app).get('/');
+    expect(root.status).toBe(200);
+    expect(root.text).toContain('window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__=90000;');
+  });
+
+  it('stamps the override into an explicit /index.html request', async () => {
+    const response = await request(serve('90000')).get('/index.html');
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__=90000;');
+  });
+
+  it('ignores an invalid override and serves the file unchanged', async () => {
+    const response = await request(serve('soon')).get('/sessions/abc');
+
+    expect(response.status).toBe(200);
+    expect(response.text).not.toContain('__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__');
   });
 });
 

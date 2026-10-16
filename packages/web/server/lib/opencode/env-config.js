@@ -21,6 +21,31 @@ export const isValidOpenCodeHostname = (value) => {
   return trimmed.split('.').every((label) => HOSTNAME_LABEL_RE.test(label));
 };
 
+/**
+ * `OPENCODE_REQUEST_TIMEOUT_MS` as milliseconds, or null when unset or
+ * unusable. The value is stamped into the UI so its non-streaming reads give
+ * up after this long, which keeps a half-open socket from holding a bootstrap
+ * slot forever (#2470). Env values arrive as strings; a value that is not a
+ * positive finite number is unusable.
+ */
+export const parseOpencodeRequestTimeoutMs = (raw) => {
+  const text = String(raw ?? '').trim();
+  if (!text) return null;
+  const value = Number(text);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.max(1, Math.floor(value));
+};
+
+/** Warn once when the raw value is set but unusable, so the operator can see why. */
+export const warnInvalidOpencodeRequestTimeoutMs = (raw, logger = console) => {
+  if (String(raw ?? '').trim() === '') return;
+  if (parseOpencodeRequestTimeoutMs(raw) !== null) return;
+  logger.warn(
+    `[config] Ignoring OPENCODE_REQUEST_TIMEOUT_MS=${JSON.stringify(raw)}: `
+    + 'must be a positive number of milliseconds',
+  );
+};
+
 export const resolveOpenCodeEnvConfig = (options = {}) => {
   const env = options.env && typeof options.env === 'object' ? options.env : {};
   const logger = options.logger ?? console;

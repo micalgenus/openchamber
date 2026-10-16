@@ -9,6 +9,8 @@ declare global {
     __OPENCHAMBER_ELECTRON__?: { runtime?: string; arch?: string; trayEnabled?: boolean; nativeFrame?: boolean };
     __OPENCHAMBER_PLATFORM__?: string;
     __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: DesktopBootOutcome;
+    /** Server `OPENCODE_REQUEST_TIMEOUT_MS` override, injected by the web/desktop/vscode shells. */
+    __OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__?: number;
   }
 
   interface WebviewElement extends HTMLElement {

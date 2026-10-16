@@ -17,6 +17,20 @@ export const RUNTIME_CONFIG_SCRIPT_PATHNAME = '/__runtime-config.js';
 const NONCE_PARAM = 'nonce';
 
 /**
+ * The UI read-timeout override as a script fragment for the application
+ * document. `OPENCODE_REQUEST_TIMEOUT_MS` arrives on the server environment,
+ * which the packaged app shares, and bounds its non-streaming reads the same
+ * way the web server's own pages are bounded. Empty when the value is unset or
+ * unusable, so the UI default stands.
+ */
+export const requestTimeoutConfigScript = (env = {}) => {
+  const value = Number(env.OPENCODE_REQUEST_TIMEOUT_MS);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  const timeoutMs = Math.max(1, Math.floor(value));
+  return `if(window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__===undefined){window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__=${timeoutMs};}`;
+};
+
+/**
  * `nonce` is required when pending: the script carries the client token, so
  * it is answered only to the document it was issued to (see
  * claimRuntimeConfigScriptRequest).

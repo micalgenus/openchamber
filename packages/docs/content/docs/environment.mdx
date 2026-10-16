@@ -80,6 +80,10 @@ Overrides the update-check API endpoint. Most users should leave this unset.
 
 Forces the package manager used by update operations when auto-detection is wrong.
 
+### `OPENCODE_REQUEST_TIMEOUT_MS`
+
+Upper bound, in milliseconds, for the UI's non-streaming reads from the OpenCode server, after which the request is aborted. The default is `30000`. Raise it when a slow machine or a large workspace makes the UI give up too early. OpenChamber reads the value at startup and stamps it into the page it serves, so changing it needs a server restart and a page reload. Streaming responses, such as a running prompt, the live event stream, and logs, are not affected. The native iOS and Android apps run their own bundled UI and keep the default.
+
 ## Proxy
 
 ### `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`

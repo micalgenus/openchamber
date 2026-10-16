@@ -16,7 +16,7 @@ This module provides OpenCode server integration utilities for the web server ru
 - The managed OpenCode's environment also carries the user's variables from Settings and from `opencode service set env` (`getUserEnvironment`, see `../environment`), over the inherited environment and under everything OpenChamber sets for OpenCode itself; enterprise mode passes none. `getManagedOpenCodeProcessEnv()` therefore includes them, so a provider key given this way is visible to the credential reader like any other variable OpenCode reports.
 - `packages/web/server/lib/opencode/provider-env-aliases.js`: mirrors known provider credential env aliases into the managed OpenCode process environment (for example `GEMINI_API_KEY` → `GOOGLE_GENERATIVE_AI_API_KEY`) so OpenCode connection detection and the upstream AI SDK agree on the same key names. Canonical implementation shared by web lifecycle and the VS Code managed spawn path (`packages/vscode/src/provider-env-aliases.ts` re-exports this module).
 - `packages/web/server/lib/opencode/env-runtime.js`: OpenCode CLI/binary resolution and shell environment runtime.
-- `packages/web/server/lib/opencode/env-config.js`: OpenCode-related environment variable parsing and validation (host/port/hostname).
+- `packages/web/server/lib/opencode/env-config.js`: OpenCode-related environment variable parsing and validation (host/port/hostname, plus the `OPENCODE_REQUEST_TIMEOUT_MS` UI read timeout).
 - `packages/web/server/lib/opencode/hmr-state-runtime.js`: HMR-persistent runtime state initialization, auth-state bootstrap, and HMR sync helpers.
 - `packages/web/server/lib/opencode/bootstrap-runtime.js`: base app bootstrap runtime for status/auth/tts/notification/OpenChamber route wiring.
 - `packages/web/server/lib/opencode/network-runtime.js`: OpenCode URL construction, health-probe readiness checks, and API prefix runtime.
@@ -422,6 +422,8 @@ ConPTY or Console Window Host behavior.
   - `configuredOpenCodeHost`
   - `effectivePort`
   - `configuredOpenCodeHostname`
+- `parseOpencodeRequestTimeoutMs(raw)`: `OPENCODE_REQUEST_TIMEOUT_MS` as whole milliseconds, or `null` when unset or unusable.
+- `warnInvalidOpencodeRequestTimeoutMs(raw, logger?)`: warns once when the raw value is set but unusable.
 
 ## Public exports (hmr-state-runtime.js)
 - `createHmrStateRuntime(dependencies)`: creates runtime for HMR state container initialization and runtime<->HMR state synchronization.
@@ -812,7 +814,7 @@ headers }` or v1 `{ npm, options }`. The stored entry is always a
 ## Public exports (static-routes-runtime.js)
 - `createStaticRoutesRuntime(dependencies)`: creates runtime for static dist resolution and static route registration.
 - Returned API:
-  - `registerStaticRoutes(app)`
+  - `registerStaticRoutes(app)`: when `OPENCODE_REQUEST_TIMEOUT_MS` is set, the document responses are stamped with it and sent `no-store`.
 
 ## Public exports (feature-routes-runtime.js)
 - `createFeatureRoutesRuntime(dependencies)`: creates runtime for main feature route registration orchestration.

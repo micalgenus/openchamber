@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUNTIME_CONFIG_SCRIPT_PATHNAME, claimRuntimeConfigScriptRequest, createRuntimeConfigGate, injectRuntimeConfig } from './packaged-runtime-config.mjs';
+import { RUNTIME_CONFIG_SCRIPT_PATHNAME, claimRuntimeConfigScriptRequest, createRuntimeConfigGate, injectRuntimeConfig, requestTimeoutConfigScript } from './packaged-runtime-config.mjs';
 
 const HTML = '<html><head><script type="module" src="/assets/main.js"></script></head><body><div id="initial-loading"></div><script>late()</script></body></html>';
 
@@ -23,6 +23,37 @@ describe('packaged runtime config injection', () => {
   it('appends the blocking script to a document without a body end tag', () => {
     const html = injectRuntimeConfig('<p>x</p>', { pending: true, scriptBody: '', nonce: 'n1' });
     assert.equal(html, `<p>x</p><script src="${RUNTIME_CONFIG_SCRIPT_PATHNAME}?nonce=n1"></script>`);
+  });
+});
+
+describe('request timeout config script', () => {
+  it('stamps a positive whole-millisecond override', () => {
+    assert.equal(
+      requestTimeoutConfigScript({ OPENCODE_REQUEST_TIMEOUT_MS: '45000' }),
+      'if(window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__===undefined){window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__=45000;}',
+    );
+    assert.match(requestTimeoutConfigScript({ OPENCODE_REQUEST_TIMEOUT_MS: '1500.9' }), /=1500;/);
+  });
+
+  it('emits nothing when the value is unset or unusable', () => {
+    for (const env of [{}, { OPENCODE_REQUEST_TIMEOUT_MS: '' }, { OPENCODE_REQUEST_TIMEOUT_MS: '  ' },
+      { OPENCODE_REQUEST_TIMEOUT_MS: 'soon' }, { OPENCODE_REQUEST_TIMEOUT_MS: '0' },
+      { OPENCODE_REQUEST_TIMEOUT_MS: '-1' }, { OPENCODE_REQUEST_TIMEOUT_MS: 'Infinity' }]) {
+      assert.equal(requestTimeoutConfigScript(env), '', JSON.stringify(env));
+    }
+  });
+
+  it('is appended to the runtime config script only when set', () => {
+    const withOverride = injectRuntimeConfig(HTML, {
+      pending: false,
+      scriptBody: `window.x=1;${requestTimeoutConfigScript({ OPENCODE_REQUEST_TIMEOUT_MS: '90000' })}`,
+    });
+    const withoutOverride = injectRuntimeConfig(HTML, {
+      pending: false,
+      scriptBody: `window.x=1;${requestTimeoutConfigScript({})}`,
+    });
+    assert.match(withOverride, /__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__=90000/);
+    assert.doesNotMatch(withoutOverride, /__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__/);
   });
 });
 

@@ -1,4 +1,16 @@
 import { registerPwaManifestRoute } from './pwa-manifest-routes.js';
+import { parseOpencodeRequestTimeoutMs, warnInvalidOpencodeRequestTimeoutMs } from './env-config.js';
+
+/**
+ * Stamp the server's `OPENCODE_REQUEST_TIMEOUT_MS` override into served HTML so
+ * the UI applies it to its first requests, before any API round trip.
+ */
+const injectOpencodeRequestTimeout = (html, timeoutMs) => {
+  const tag = `<script>window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__=${timeoutMs};</script>`;
+  if (html.includes('<head>')) return html.replace('<head>', `<head>${tag}`);
+  if (html.includes('</head>')) return html.replace('</head>', `${tag}</head>`);
+  return `${tag}${html}`;
+};
 
 export const createStaticRoutesRuntime = (dependencies) => {
   const {
@@ -24,13 +36,42 @@ export const createStaticRoutesRuntime = (dependencies) => {
     return path.join(__dirname, '..', 'dist');
   };
 
+  const serveInjectedIndex = (res, distPath, timeoutMs) => {
+    const indexPath = path.join(distPath, 'index.html');
+    fs.readFile(indexPath, 'utf8', (error, html) => {
+      if (error) {
+        res.sendFile(indexPath);
+        return;
+      }
+      // index.html names the hashed asset files, so a cached copy from before
+      // a restart would also carry the previous override value.
+      res.setHeader('Cache-Control', 'no-store');
+      res.type('html').send(injectOpencodeRequestTimeout(html, timeoutMs));
+    });
+  };
+
   const registerStaticRoutes = (app) => {
     const distPath = resolveDistPath();
+    // Read once: an override only takes effect on restart either way, and a
+    // warning per document request would spam the logs.
+    const rawRequestTimeout = process.env?.OPENCODE_REQUEST_TIMEOUT_MS;
+    warnInvalidOpencodeRequestTimeoutMs(rawRequestTimeout);
+    const requestTimeoutOverrideMs = parseOpencodeRequestTimeoutMs(rawRequestTimeout);
 
     if (fs.existsSync(distPath)) {
       console.log(`Serving static files from ${distPath}`);
       const hashedAssetsPrefix = path.join(distPath, 'assets') + path.sep;
+      if (requestTimeoutOverrideMs !== null) {
+        // express.static would answer `/index.html` from disk ahead of the
+        // fallback below; route it through the injector too.
+        app.get('/index.html', (_req, res) => {
+          serveInjectedIndex(res, distPath, requestTimeoutOverrideMs);
+        });
+      }
       app.use(express.static(distPath, {
+        // With an override, `/` and `/index.html` go through the injector
+        // below instead of the file on disk.
+        index: requestTimeoutOverrideMs === null ? undefined : false,
         setHeaders(res, filePath) {
           // Service workers should never be long-cached; iOS is especially sensitive.
           if (filePath.endsWith(`${path.sep}sw.js`)) {
@@ -58,7 +99,11 @@ export const createStaticRoutesRuntime = (dependencies) => {
       });
 
       app.get(/^(?!\/api|\/linear|.*\.(js|css|svg|png|jpg|jpeg|gif|ico|woff|woff2|ttf|eot|map)).*$/, (_req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
+        if (requestTimeoutOverrideMs === null) {
+          res.sendFile(path.join(distPath, 'index.html'));
+          return;
+        }
+        serveInjectedIndex(res, distPath, requestTimeoutOverrideMs);
       });
       return;
     }

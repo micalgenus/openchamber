@@ -934,6 +934,26 @@ describe("read timeouts (#2470)", () => {
   })
 })
 
+describe("injected read timeout override", () => {
+  test("the override present at module load bounds the default reads", async () => {
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window")
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: { __OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__: 25 },
+    })
+    try {
+      const mod = await import(`./client?client-timeout-test=${Date.now()}`)
+      const client = mod.createRuntimeOpencodeClient({ baseUrl: "http://runtime.test/api" })
+      responses.push(HANG)
+      const failure = await client.server.info().catch((error: Error) => error)
+      expect(failure).toMatchObject({ cause: { message: "OpenCode request timed out after 25ms" } })
+    } finally {
+      if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow)
+      else Reflect.deleteProperty(globalThis, "window")
+    }
+  })
+})
+
 describe("sendCommand context", () => {
   test("delivers attached context as non-resuming synthetic messages before the command", async () => {
     responses.push(new Response(null, { status: 204 })) // model switch

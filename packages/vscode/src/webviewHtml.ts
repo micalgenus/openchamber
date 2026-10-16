@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as os from 'os';
+import { parseOpencodeRequestTimeoutMs } from '../../web/server/lib/opencode/env-config.js';
 import { getThemeKindName } from './theme';
 import type { ConnectionStatus } from './opencode';
 import type { WorkspaceFolderCandidate } from './workspaceResolver';
@@ -81,6 +82,10 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
   const workerSrc = uniqueTokens([webview.cspSource, 'blob:', devServerOrigin]);
 
   const themeKind = getThemeKindName(vscode.window.activeColorTheme.kind);
+
+  // UI read timeout override from the extension host environment, stamped so
+  // the UI applies it to its first reads. Absent when unset or unusable.
+  const requestTimeoutMs = parseOpencodeRequestTimeoutMs(process.env.OPENCODE_REQUEST_TIMEOUT_MS);
 
   // Use VS Code CSS variables for proper theme integration
   // These variables are automatically provided by VS Code to webviews
@@ -203,6 +208,7 @@ export function getWebviewHtml(options: WebviewHtmlOptions): string {
       initialComposer: ${initialComposer ? `"${initialComposer}"` : 'null'},
     };
     window.__OPENCHAMBER_HOME__ = "${workspaceFolder.replace(/\\/g, '\\\\')}";
+    ${requestTimeoutMs === null ? '' : `window.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__ = ${requestTimeoutMs};`}
     // VS Code's display language. The UI bundle uses it as the default locale
     // until the user picks one; the splash below picks its strings from it too.
     window.__OPENCHAMBER_HOST_LANGUAGE__ = ${JSON.stringify(vscode.env.language)};

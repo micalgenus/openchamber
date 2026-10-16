@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { isValidOpenCodeHostname, resolveOpenCodeEnvConfig } from './env-config.js';
+import {
+  isValidOpenCodeHostname,
+  parseOpencodeRequestTimeoutMs,
+  resolveOpenCodeEnvConfig,
+  warnInvalidOpencodeRequestTimeoutMs,
+} from './env-config.js';
 
 describe('isValidOpenCodeHostname', () => {
   it('accepts IPv4 addresses', () => {
@@ -115,5 +120,39 @@ describe('resolveOpenCodeEnvConfig OPENCODE_HOST', () => {
     const result = resolveOpenCodeEnvConfig({ env: { OPENCODE_HOST: 'https://opencode.example' }, logger });
     expect(result.configuredOpenCodeHost).toBeNull();
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('must include an explicit port'));
+  });
+});
+
+describe('parseOpencodeRequestTimeoutMs', () => {
+  it('reads a positive millisecond value', () => {
+    expect(parseOpencodeRequestTimeoutMs('60000')).toBe(60000);
+    expect(parseOpencodeRequestTimeoutMs('  5000  ')).toBe(5000);
+  });
+
+  it('floors fractional values to at least 1ms', () => {
+    expect(parseOpencodeRequestTimeoutMs('1500.9')).toBe(1500);
+    expect(parseOpencodeRequestTimeoutMs('0.5')).toBe(1);
+  });
+
+  it('returns null for missing, empty, and non-positive values', () => {
+    for (const raw of [undefined, null, '', '   ', '0', '-5', 'nope', 'Infinity', 'NaN', {}]) {
+      expect(parseOpencodeRequestTimeoutMs(raw), JSON.stringify(raw)).toBeNull();
+    }
+  });
+});
+
+describe('warnInvalidOpencodeRequestTimeoutMs', () => {
+  it('says nothing when the value is absent or usable', () => {
+    const logger = { warn: vi.fn() };
+    warnInvalidOpencodeRequestTimeoutMs(undefined, logger);
+    warnInvalidOpencodeRequestTimeoutMs('', logger);
+    warnInvalidOpencodeRequestTimeoutMs('45000', logger);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('warns when the value is set but unusable', () => {
+    const logger = { warn: vi.fn() };
+    warnInvalidOpencodeRequestTimeoutMs('soon', logger);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('OPENCODE_REQUEST_TIMEOUT_MS'));
   });
 });

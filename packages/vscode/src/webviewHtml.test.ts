@@ -24,3 +24,13 @@ describe('VS Code webview content security policy', () => {
     assert.ok(bootstrap >= 0 && bootstrap < options && options < application);
   });
 });
+
+describe('VS Code webview request timeout override', () => {
+  test('stamps the shared OPENCODE_REQUEST_TIMEOUT_MS parse, and only when it is usable', () => {
+    assert.match(source, /import \{ parseOpencodeRequestTimeoutMs \} from '\.\.\/\.\.\/web\/server\/lib\/opencode\/env-config\.js'/);
+    assert.match(source, /parseOpencodeRequestTimeoutMs\(process\.env\.OPENCODE_REQUEST_TIMEOUT_MS\)/);
+    assert.match(source, /window\.__OPENCHAMBER_OPENCODE_REQUEST_TIMEOUT_MS__ = \$\{requestTimeoutMs\}/);
+    // Unset or unusable leaves the document untouched, so the UI default stands.
+    assert.match(source, /requestTimeoutMs === null \? '' :/);
+  });
+});

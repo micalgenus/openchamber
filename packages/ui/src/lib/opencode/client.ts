@@ -41,6 +41,7 @@ import { normalizePath } from "@/lib/pathNormalization"
 import { PART_SHELLS_HEADER, PART_SHELLS_VERSION } from "./toolContentShells"
 import { isAutoModel } from "@/lib/routing/autoModel"
 import { activeSessionSnapshotSchema, hostSessionStatusSnapshotSchema, type HostSessionStatusSnapshot } from "./session-status"
+import { OPENCODE_REQUEST_TIMEOUT_DEFAULT_MS, readInjectedOpencodeRequestTimeoutMs } from "./request-timeout"
 import {
   compact,
   type Agent,
@@ -303,13 +304,14 @@ const createTimeoutSignal = (timeoutMs: number): { signal: AbortSignal; cleanup:
 }
 
 /**
- * Upper bound for non-streaming OpenCode read requests. Without it, a socket
- * that neither resolves nor rejects (the half-open state described in #2470)
- * keeps the bootstrap concurrency slot busy forever and the UI stays on
- * "loading sessions". Long-lived streams (prompts, the event SSE, session logs)
- * are excluded in {@link createRuntimeOpencodeClient}.
+ * Upper bound for non-streaming OpenCode read requests. The server can raise or
+ * lower it with `OPENCODE_REQUEST_TIMEOUT_MS`; the shells inject that value
+ * into the document before its module scripts run, so it applies to the first
+ * requests. The native mobile app runs a bundled document with no
+ * server-served HTML to stamp, so it keeps the default.
  */
-const OPENCODE_REQUEST_TIMEOUT_MS = 30_000
+const OPENCODE_REQUEST_TIMEOUT_MS = readInjectedOpencodeRequestTimeoutMs({ window: globalThis.window })
+  ?? OPENCODE_REQUEST_TIMEOUT_DEFAULT_MS
 
 const isEventStreamUrl = (url: URL): boolean => url.pathname.endsWith("/event") || url.pathname.endsWith("/log")
 

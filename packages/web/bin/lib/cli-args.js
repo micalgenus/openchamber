@@ -650,6 +650,7 @@ ENVIRONMENT:
   OPENCODE_PORT               Port of external OpenCode server to connect to
   OPENCODE_SKIP_START          Skip starting OpenCode, use external server
   OPENCHAMBER_OPENCODE_HOSTNAME  Bind hostname for managed OpenCode server (default: 127.0.0.1)
+  OPENCODE_REQUEST_TIMEOUT_MS  UI read timeout for non-streaming OpenCode requests in ms (default: 30000)
 
 EXAMPLES:
   openchamber                    # Start in daemon mode on default port 3000 (or free port)
